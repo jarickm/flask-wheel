@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CCI Raffle Workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; height: 100vh; overflow: hidden; background: #f8fafc; color: #000; }
+        .mesh-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2;
+            background: radial-gradient(at 0% 0%, #0056b3 0%, #00a8e8 50%, #ffffff 100%);
+            background-size: 200% 200%; animation: meshMove 20s ease infinite;
+        }
+        @keyframes meshMove { 0% {background-position:0% 50%} 50% {background-position:100% 50%} 100% {background-position:0% 50%} }
+        .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.4); border-radius: 32px; }
+        #wheel-canvas { width: 550px; height: 550px; filter: drop-shadow(0 20px 50px rgba(0,0,0,0.3)); transform: rotate(0deg); }
+        .pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 25px solid transparent; border-right: 25px solid transparent; border-top: 50px solid #0056b3; z-index: 50; }
+        .nav-btn { font-weight: 800; font-size: 13px; padding: 12px 28px; border-radius: 99px; transition: 0.3s; color: black !important; }
+        .nav-active { background: #000; color: #fff !important; }
+        .nav-inactive { background: rgba(255,255,255,0.8); }
+        .scroll-v::-webkit-scrollbar { width: 6px; }
+        .scroll-v::-webkit-scrollbar-thumb { background: #0056b3; border-radius: 10px; }
+        * { color: #000; }
+
+        /* Animation */
+        @keyframes trophyBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+        .animate-trophy { animation: trophyBounce 2s infinite ease-in-out; }
+    </style>
+</head>
+<body class="p-6">
+    <div class="mesh-bg"></div>
+
+    <header class="flex justify-between items-center mb-8 px-8">
+        <img src="/static/logo.png" alt="Coolaire" class="h-16 object-contain drop-shadow-lg">
+        <div class="glass p-2 flex gap-2">
+            <button id="btnStage" onclick="switchTab('stage')" class="nav-btn nav-active uppercase">Big Screen</button>
+            <button id="btnDashboard" onclick="switchTab('dashboard')" class="nav-btn nav-inactive uppercase">Control Center</button>
+        </div>
+        <div class="flex gap-4 items-center">
+            <button onclick="toggleAudio()" class="glass px-6 py-2 text-[10px] font-black uppercase">🎵 Music</button>
+            <a href="/logout" class="text-[10px] font-black text-red-600 uppercase underline">Logout</a>
+        </div>
+    </header>
+
+    <!-- VIEW: BIG SCREEN (RAFFLE STAGE) -->
+    <main id="viewStage" class="flex flex-col items-center justify-center h-[calc(100vh-200px)] relative">
+        <div class="relative">
+            <div class="pointer"></div>
+            <canvas id="wheel-canvas"></canvas>
+        </div>
+        <button onclick="spin()" id="spinBtn" class="mt-14 px-36 py-8 bg-[#0056b3] rounded-full font-black text-4xl shadow-2xl hover:scale-105 active:scale-95 transition-all text-white-force">
+            <span style="color:white">SPIN NOW</span>
+        </button>
+
+        <!-- Winner Modal -->
+        <div id="winModal" class="hidden absolute inset-0 z-[200] glass flex flex-col items-center justify-center text-center p-12 !bg-white/98">
+            <div class="text-[160px] mb-4 animate-trophy">🏆</div>
+            <h2 id="winUser" class="text-9xl font-black mb-2 tracking-tighter">Winner!</h2>
+            <p class="text-4xl font-bold opacity-70">won a <span id="winItem" style="color:#0056b3">Prize</span></p>
+            <button onclick="closeWin()" class="mt-16 px-24 py-6 bg-black text-white rounded-3xl font-black text-2xl shadow-xl"><span style="color:white">CONTINUE</span></button>
+        </div>
+    </main>
+
+    <!-- VIEW: DASHBOARD (CONTROL CENTER) -->
+    <main id="viewDashboard" class="hidden h-[calc(100vh-200px)] px-8 overflow-hidden">
+        <!-- Dashboard Header Stats -->
+        <div class="grid grid-cols-3 gap-6 mb-8">
+            <div class="glass p-6 text-center">
+                <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Registered Guests</p>
+                <h4 id="statGuests" class="text-4xl font-black text-[#0056b3]">0</h4>
+            </div>
+            <div class="glass p-6 text-center">
+                <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Prizes in Pool</p>
+                <h4 id="statPrizes" class="text-4xl font-black text-[#0056b3]">0</h4>
+            </div>
+            <div class="glass p-6 text-center">
+                <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Winners</p>
+                <h4 id="statWinners" class="text-4xl font-black text-[#0056b3]">0</h4>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-6 h-full pb-32">
+            <!-- Participants -->
+            <div class="col-span-4 glass p-6 flex flex-col overflow-hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-black text-sm uppercase">Guest Registry</h3>
+                    <button onclick="clearData('participants')" class="text-[9px] font-bold text-red-600 border border-red-100 px-3 py-1 rounded-full uppercase">Reset</button>
+                </div>
+                <div id="listGuests" class="flex-1 overflow-y-auto scroll-v space-y-2 pr-2"></div>
+            </div>
+
+            <!-- Prizes -->
+            <div class="col-span-4 glass p-6 flex flex-col overflow-hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-black text-sm uppercase">Prize Management</h3>
+                    <button onclick="clearData('prizes')" class="text-[9px] font-bold text-red-600 border border-red-100 px-3 py-1 rounded-full uppercase">Clear</button>
+                </div>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="inIcon" value="🎁" class="w-14 p-3 rounded-2xl bg-white text-center text-xl">
+                    <input type="text" id="inPrize" placeholder="New Prize..." class="flex-1 p-3 rounded-2xl bg-white font-bold" onkeydown="if(event.key==='Enter') addPrize()">
+                </div>
+                <div id="listPrizes" class="flex-1 overflow-y-auto scroll-v space-y-2 pr-2"></div>
+            </div>
+
+            <!-- History -->
+            <div class="col-span-4 glass p-6 flex flex-col overflow-hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-black text-sm uppercase">Winner History</h3>
+                    <button onclick="clearData('history')" class="text-[9px] font-bold text-red-600 border border-red-100 px-3 py-1 rounded-full uppercase">Wipe</button>
+                </div>
+                <div id="historyList" class="flex-1 overflow-y-auto scroll-v space-y-2 pr-2"></div>
+            </div>
+        </div>
+    </main>
+
+    <audio id="sfxSpin" src="https://assets.mixkit.co/active_storage/sfx/2005/2005-preview.mp3"></audio>
+    <audio id="bgMusic" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3"></audio>
+
+    <script>
+        const canvas = document.getElementById('wheel-canvas');
+        const ctx = canvas.getContext('2d');
+        let state = { participants: [], prizes: [], history: [], stats: {} };
+        let totalRotation = 0;
+        const brandColors = ['#0056b3', '#ffffff', '#00a8e8', '#f1f5f9', '#003366', '#e0f2fe'];
+
+        async function sync() {
+            try {
+                const res = await fetch('/get_state');
+                state = await res.json();
+                renderUI();
+                if (!document.getElementById('viewStage').classList.contains('hidden')) draw();
+            } catch (e) { console.error(e); }
+        }
+
+        setInterval(sync, 5000); // Live update guests
+
+        function switchTab(t) {
+            document.getElementById('viewStage').classList.toggle('hidden', t !== 'stage');
+            document.getElementById('viewDashboard').classList.toggle('hidden', t !== 'dashboard');
+            document.getElementById('btnStage').className = `nav-btn ${t === 'stage' ? 'nav-active' : 'nav-inactive'}`;
+            document.getElementById('btnDashboard').className = `nav-btn ${t === 'dashboard' ? 'nav-active' : 'nav-inactive'}`;
+        }
+
+        function draw() {
+            canvas.width = canvas.height = 1000;
+            const cx = 500, cy = 500, radius = 480;
+            ctx.clearRect(0, 0, 1000, 1000);
+            if (state.prizes.length === 0) return;
+            const total = state.prizes.reduce((a, b) => a + b.weight, 0);
+            let start = 0;
+            state.prizes.forEach((p, i) => {
+                const angle = (p.weight / total) * Math.PI * 2;
+                p.startAngle = start; p.endAngle = start + angle;
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, radius, start, start + angle);
+                ctx.fillStyle = brandColors[i % brandColors.length]; ctx.fill();
+                ctx.strokeStyle = '#0056b3'; ctx.lineWidth = 4; ctx.stroke();
+                ctx.save(); ctx.translate(cx, cy); ctx.rotate(start + angle/2);
+                ctx.shadowColor = "white"; ctx.shadowBlur = 15; ctx.fillStyle = "black"; ctx.font = "bold 32px Plus Jakarta Sans"; ctx.textAlign = "right";
+                ctx.fillText(`${p.icon} ${p.name.toUpperCase()}`, radius - 80, 10); ctx.restore();
+                start += angle;
+            });
+            ctx.beginPath(); ctx.arc(cx, cy, 120, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
+            ctx.strokeStyle = '#0056b3'; ctx.lineWidth = 15; ctx.stroke();
+        }
+
+        async function spin() {
+            if (state.participants.length === 0 || state.prizes.length === 0) return alert("Add data first!");
+            const btn = document.getElementById('spinBtn');
+            btn.disabled = true;
+            document.getElementById('sfxSpin').play();
+            const res = await fetch('/spin', {method: 'POST'});
+            const data = await res.json();
+            const winP = state.prizes[data.prizeIndex];
+            const mid = winP.startAngle + (winP.endAngle - winP.startAngle)/2;
+            const stopDeg = ((1.5 * Math.PI) - mid) * 180 / Math.PI;
+            totalRotation += (360 * 10) + (stopDeg - (totalRotation % 360));
+            canvas.style.transition = `transform 8s cubic-bezier(0.1, 0, 0.1, 1)`;
+            canvas.style.transform = `rotate(${totalRotation}deg)`;
+            setTimeout(() => {
+                confetti({ particleCount: 400, spread: 120, origin: { y: 0.6 } });
+                document.getElementById('winUser').innerText = data.winner;
+                document.getElementById('winItem').innerText = data.prize.name;
+                document.getElementById('winModal').classList.remove('hidden');
+            }, 8000);
+        }
+
+        function closeWin() {
+            document.getElementById('winModal').classList.add('hidden');
+            document.getElementById('spinBtn').disabled = false;
+            sync();
+        }
+
+        async function addPrize() {
+            const name = document.getElementById('inPrize').value;
+            const icon = document.getElementById('inIcon').value || '🎁';
+            if(!name) return;
+            await fetch('/add_prize', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, icon}) });
+            document.getElementById('inPrize').value = ''; sync();
+        }
+
+        async function clearData(target) {
+            if(confirm(`Wipe ${target}?`)) {
+                await fetch('/clear_data', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target}) });
+                sync();
+            }
+        }
+
+        function renderUI() {
+            document.getElementById('statGuests').innerText = state.stats.total_guests || 0;
+            document.getElementById('statPrizes').innerText = state.stats.total_prizes || 0;
+            document.getElementById('statWinners').innerText = state.stats.total_winners || 0;
+
+            document.getElementById('listGuests').innerHTML = state.participants.map(p => `<div class="p-3 bg-white/70 rounded-xl font-bold text-sm shadow-sm mb-1">👤 ${p}</div>`).join('');
+            document.getElementById('listPrizes').innerHTML = state.prizes.map(p => `<div class="p-3 bg-white/70 rounded-xl font-bold text-[11px] uppercase shadow-sm mb-1">${p.icon} ${p.name}</div>`).join('');
+            document.getElementById('historyList').innerHTML = (state.history || []).map(h => `
+                <div class="p-3 bg-white/80 border-l-4 border-[#0056b3] rounded-xl shadow-sm mb-2">
+                    <p class="font-black text-sm">${h.name}</p>
+                    <p class="text-[10px] opacity-60">${h.prize} • ${h.time}</p>
+                </div>
+            `).join('');
+        }
+
+        function toggleAudio() {
+            const bg = document.getElementById('bgMusic');
+            bg.paused ? bg.play() : bg.pause();
+        }
+
+        window.onload = sync;
+
+        function renderUI() {
+        // Update the 3 Stat Boxes at the top of the Dashboard
+        if (state.stats) {
+            document.getElementById('statGuests').innerText = state.stats.total_guests || 0;
+            document.getElementById('statPrizes').innerText = state.stats.total_prizes || 0;
+            document.getElementById('statWinners').innerText = state.stats.total_winners || 0;
+        }
+
+        // Update Guest List with the new Company and Phone badges
+        if (state.participants_full) {
+            document.getElementById('listGuests').innerHTML = state.participants_full.map(p => `
+                <div class="p-4 bg-white/70 rounded-2xl shadow-sm mb-2 border border-slate-100">
+                    <div class="flex justify-between items-start">
+                        <p class="font-black text-sm text-slate-900">👤 ${p.name}</p>
+                        <span class="text-[9px] font-bold bg-[#0056b3] text-white px-2 py-0.5 rounded-full uppercase">
+                            ${p.company || 'N/A'}
+                        </span>
+                    </div>
+                    <div class="flex gap-4 mt-1 opacity-60">
+                        <p class="text-[10px] font-bold text-slate-900">📱 ${p.phone || 'N/A'}</p>
+                        <p class="text-[10px] font-bold text-slate-900">🏢 ${p.dept || 'N/A'}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update Prize list
+        document.getElementById('listPrizes').innerHTML = state.prizes.map(p => `
+            <div class="p-3 bg-white/70 rounded-xl font-bold text-[11px] uppercase shadow-sm mb-1">
+                ${p.icon} ${p.name}
+            </div>
+        `).join('');
+
+        // Update Winner History list
+        document.getElementById('historyList').innerHTML = (state.history || []).map(h => `
+            <div class="p-3 bg-white/80 border-l-4 border-[#0056b3] rounded-xl shadow-sm mb-2">
+                <p class="font-black text-sm text-slate-900">${h.name}</p>
+                <p class="text-[10px] text-slate-500 opacity-60">${h.prize} • ${h.time}</p>
+            </div>
+        `).join('');
+    }
+
+    </script>
+</body>
+</html>

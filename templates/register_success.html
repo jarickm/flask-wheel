@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Successful | Coolaire</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #0056b3;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body class="p-6 text-center">
+    <div class="animate-in fade-in zoom-in duration-700">
+        <img src="/static/logo.png" alt="Coolaire" class="h-16 mx-auto mb-8 drop-shadow-lg">
+
+        <div class="text-9xl mb-6">✅</div>
+
+        <h1 class="text-4xl font-black mb-4 tracking-tighter uppercase">Success!</h1>
+        <p class="text-xl font-bold opacity-90 mb-8">
+            Thank you, <span class="text-yellow-300 underline">{{ name }}</span>!<br>
+            Your entry has been registered.
+        </p>
+
+        <p class="text-sm opacity-60 font-bold uppercase tracking-widest">
+            Please watch the main stage to see if you win!
+        </p>
+
+        <div class="mt-12 flex flex-col gap-4 items-center">
+            <a href="/register" class="text-sm font-bold border-b border-white pb-1 opacity-80 hover:opacity-100 transition">
+                Register another person
+            </a>
+
+            <a href="/login" class="text-xs font-bold opacity-40 hover:opacity-100 transition uppercase tracking-widest mt-4">
+                ← Back to Login
+            </a>
+        </div>
+    </div>
+</body>
+</html>
